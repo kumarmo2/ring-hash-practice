@@ -4,20 +4,90 @@ using System.Text;
 
 Ring ring = new Ring();
 Node n1 = new Node("1");
-Node n2 = new Node("2");
+Node n2 = new Node("4");
 
 ring.AddNode(n1);
 ring.AddNode(n2);
 
 foreach (var virtualNode in ring.VirtualNodes)
 {
-    Console.WriteLine($"virtualNode: hash: {virtualNode._hash}");
+    Console.WriteLine($"Node, identifier{virtualNode._node.Identifier}, virtualNode: hash: {virtualNode._hash} ");
 }
+
+var target = "-1";
+var hasher = MD5.Create();
+Console.WriteLine($"target: {target}, hash: {Utils.GetHashHexString(target, hasher)}");
+
+var assinged = ring.AssignNode(target);
+
+Console.WriteLine($"AssignNode, identifier: {assinged.Identifier}");
 
 public static class Utils
 {
     public static string GetHashHexString(string input, HashAlgorithm hasher) =>
         BitConverter.ToString(hasher.ComputeHash(Encoding.ASCII.GetBytes(input)));
+
+
+
+    // Given a sorted array and a target, find the index of target in the array. If target is not
+    // found, find the next larger number than target and return its index.
+    // if target is largest than largest in items, it must return the smallest in items.
+    // if target is smaller than smallest in iterms, then it must return the smallest.
+    public static VirtualNode? CyclicBinarySearch(List<VirtualNode> items, string targetHash)
+    {
+        if (items is null || items.Count == 0)
+        {
+            return null;
+        }
+
+        var n = items.Count;
+        var left = 0;
+        var right = n - 1;
+        var mid = (left + right) / 2;
+
+
+        while (true)
+        {
+            if (left > right)
+            {
+                break;
+            }
+            mid = (left + right) / 2;
+            var mid_value = items[mid]._hash;
+
+            var comparison = targetHash.CompareTo(mid_value);
+            if (comparison == 0)
+            {
+                return items[mid];
+            }
+
+            if (comparison > 0)
+            {
+                left = mid + 1;
+            }
+            else
+            {
+                right = mid - 1;
+            }
+        }
+
+        if (mid == 0)
+        {
+            return items[0];
+        }
+        else if (left > n - 1)
+        {
+            return items[0];
+        }
+        else
+        {
+            if (items[right]._hash.CompareTo(targetHash) > 0)
+            {
+                return items[right];
+            }
+            return items[left];
+        }
+    }
 }
 
 public class Node
@@ -40,7 +110,7 @@ public class Node
 
 public class VirtualNode : IComparable<VirtualNode>
 {
-    private Node _node;
+    internal Node _node;
     internal int _virtualNodeIdPerNode;
     internal string _hash;
     private HashAlgorithm _hasher;
@@ -92,13 +162,22 @@ public class Ring : IDisposable
         get => _ring;
     }
 
-    public Node AssignNode(string input)
+    public Node? AssignNode(string input)
     {
+        if (_ring.Count == 0)
+        {
+            throw new Exception("add nodes to the ring");
+        }
         var hash = Utils.GetHashHexString(input, _hasher);
-        // TODO:
-        // do the binary search on the input and the List<VirtualNode> and return
-        // the node of the virutal node
-        throw new NotImplementedException();
+
+        var virtualNode = Utils.CyclicBinarySearch(_ring, hash);
+        if (virtualNode is null)
+        {
+            /*Impossible to happen*/
+            return null;
+        }
+        return virtualNode._node;
+
     }
 
     public void AddNode(Node node)
